@@ -1,25 +1,59 @@
 #include <opencv2/opencv.hpp>
 #include "CVGeometryUtils.h"
+#include <math.h>
 
 using namespace cv;
 
+Point getRectCenter(Rect r) {
+	return (r.br() + r.tl()) * 0.5; 
+}
 
-Point getRectCenter(Rect) {
+
+void getLinePointsThroughRegionCenterAtDegree(double degree, Point center, int radius, Point &p1, Point &p2) {
+	int del_x, del_y;
+
+	del_x = radius * cos(degree * M_PI / 180.0);	
+	del_y = - radius * sin(degree * M_PI / 180.0);	
+
+	p1.x = center.x + del_x;
+	p1.y = center.y + del_y;
+
+	p2.x = center.x - del_x;
+	p2.y = center.y - del_y;
 
 }
 
 
-void getLinePointsThroughRegionCenterAtDegree(double, Point, int, Point, Point) {
-	
-}
-
-
-void getPerpendicularLinePoints(int, double, Point, int, Point, Point) {
+void getPerpendicularLinePoints(int, double, Point, int, Point, Point) {	
 
 }	
 
 
-bool isRectInLine(Rect, Point, Point) {
+bool isRectInLine(const Rect &r, const Point &start, const Point &end) {
+	bool cond1, cond2;
+	float slope = static_cast<float>(end.y - start.y) / (end.x - start.x);
+	float intercept = static_cast<float>(end.y) - slope * end.x;
+
+	cv::Point top_left, top_right, bottom_left, bottom_right;
+
+	top_left = r.tl();
+	top_right = r.tl();
+	top_right.x += r.width;
+	bottom_right = r.br();
+	bottom_left = r.br();
+	bottom_left.x -= r.width;
+
+	cond1 = (static_cast<float>(bottom_left.y) > slope * bottom_left.x + intercept) != 
+			(static_cast<float>(top_right.y) > slope * top_right.x + intercept);	
+
+	cond2 = (static_cast<float>(bottom_right.y) > slope * bottom_right.x + intercept) != 
+			(static_cast<float>(top_left.y) > slope * top_left.x + intercept);	
+
+	return (cond1 || cond2); 
+
+}
+
+bool isRectInCircle(const cv::Rect &r, const cv::Point &center, int radius) {
 
 }
 

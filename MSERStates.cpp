@@ -8,11 +8,25 @@ using namespace std;
 using namespace cv;
 
 
+/* 
+ * Function: MSERStates::generateHistogram
+ *
+ * Description: calculates the histogram of the projection profile of 
+ *				a mser connected component with a state of siteState
+ *
+ */	
 void MSERStates::generateHistogram(int siteID, const MSERState &siteState, vector<int> &histogram) {
 	Rect mser = msers[siteID];
 	Point center = getRectCenter(mser);
 	int radius = siteState.scale.first / 2;
 	double orientation = siteState.orientation;
+	vector<Rect&> msers_in_region;
+
+	/* First iterate and find the msers in the circular region so we dont waste time later */
+	for (Rect r : msers) {
+		if (isRectInCircle(r, center, radius) 
+				mser_in_region.push_back(r);
+	}
 
 	Point p1, p2;
 	LineIterator center_axis;
@@ -40,7 +54,13 @@ void MSERStates::generateHistogram(int siteID, const MSERState &siteState, vecto
 
 }
 
-
+/*
+ * Function: MSERStates::encodeLabelToState
+ *
+ * Description: given a labeling, it converts it into an 
+ *					- orientation angle 
+ *					- scale(int N, int k)
+ */
 void MSERStates::encodeLabelToState(int label, MSERState &s) {
 	int k_orientation = label / qunatized_scale_factor;
 	int scale_index = label % quantized_scale_factor;
@@ -50,6 +70,18 @@ void MSERStates::encodeLabelToState(int label, MSERState &s) {
 }
 
 
+/*
+ * Function: MSERStates::dataCost
+ *
+ * Description: Assigns a energy to a site given a label.
+ *				This function is passed to the GCOptimization Library
+ *
+ *				The energy calculation is defined in the following paper:
+ *					Text-Line Detection in Camera-Captured Document Images
+ *					Using the State Estimation of Connected Components
+ *
+ *					url: http://ieeexplore.ieee.org/document/7563454/
+ */
 double MSERStates::dataCost(int siteID, int label) {
 	MSERState siteState;
 	vector<int> histogram;
@@ -87,7 +119,7 @@ double MSERStates::dataCost(int siteID, int label) {
 	fftw_execute(p);
 
 	double mag_X0_squared = pow(X[0][0], 2) + pow(X[0][1], 2);
-	double mag_Xk_squared = pow(X[0][0], 2) + pow(X[0][1], 2);
+	double mag_Xk_squared = pow(X[k][0], 2) + pow(X[k][1], 2);
 	double v_p1 = -log10(mag_Xk_squared / mag_X0_squared);
 
 	/* V_2 Calculation: number of non-zero vals in the projection profile */
@@ -104,6 +136,19 @@ double MSERStates::dataCost(int siteID, int label) {
 
 }
 
+/*
+ * Function: MSER::smoothCost
+ *
+ * Description: Assigns an enery to two sites with their respective labels.
+ *				This function is passed to the GCOptimization Library
+ *
+ *				The energy calculation is defined in the following paper:
+ *					Text-Line Detection in Camera-Captured Document Images
+ *					Using the State Estimation of Connected Components
+ *
+ *					url: http://ieeexplore.ieee.org/document/7563454/
+ *				
+ */
 double MSERStates::smoothCost(int siteID1, int sitdID2, int l1, int l2) {
 	Rect mser1 = msers[siteID1], mser2 = msers[siteID2];
 	MSERtate s1, s2;
@@ -121,6 +166,22 @@ double MSERStates::smoothCost(int siteID1, int sitdID2, int l1, int l2) {
 
 	return u_1_2 * exp(- (BETA * distance_squared_site1_site2) / ( s1_squared + s2_squared ) ); 
 }
+
+/*
+ * Function MSERStates::stateDistance
+ *
+ * Description: Computes the distances between two states, which in this case will be 
+ *				interpreted by int labels
+ *
+ *				The distance between states is calculated as follows:
+ *				| f_p - f_q | = | s_p - s_q | + | theta_p - theta_q |
+ *
+ *				This comes from the following paper:
+ *					Text-Line Detection in Camera-Captured Document Images
+ *					Using the State Estimation of Connected Components
+ *
+ *					url: http://ieeexplore.ieee.org/document/7563454/
+ */
 
 double MSERtates::stateDistance(int label1, int label2) {
 	int s1_index, s2_index, theta1_index, theta2_index;

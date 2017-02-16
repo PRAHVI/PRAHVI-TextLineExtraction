@@ -2,8 +2,9 @@
 #define CVGEOMETRYUTILS_H
 
 extern cv::Point getRectCenter(cv::Rect);
-extern void getLinePointsThroughRegionCenterAtDegree(double, cv::Point, int, cv::Point, cv::Point);
-extern void getPerpendicularLinePoints(int, double, cv::Point, int, cv::Point, cv::Point);
-extern bool isRectInLine(cv::Rect, cv::Point, cv::Point);
+extern void getLinePointsThroughRegionCenterAtDegree(double, const cv::Point&, int, cv::Point&, cv::Point&);
+extern void getPerpendicularLinePoints(int, double, const cv::Point&, int, cv::Point&, cv::Point&);
+extern bool isRectInLine(const cv::Rect &, const cv::Point&, const cv::Point&);
+extern bool isRectInCircle(const cv::Rect &, const cv::Point&, int);
 
 #endif 
