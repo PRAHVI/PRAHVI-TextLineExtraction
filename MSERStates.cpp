@@ -59,13 +59,14 @@ void MSERStates::generateHistogram(int siteID, const MSERState &siteState, vecto
  *
  * Description: given a labeling, it converts it into an 
  *					- orientation angle 
+
  *					- scale(int N, int k)
  */
 void MSERStates::encodeLabelToState(int label, MSERState &s) {
 	int k_orientation = label / qunatized_scale_factor;
 	int scale_index = label % quantized_scale_factor;
 
-	s.orientation = static_cast<double>(k_orientation) * M_PI / static_cast<double>(quantized_orientation_factor);
+	s.orientation = (static_cast<double>(k_orientation) * M_PI / static_cast<double>(quantized_orientation_factor)) * (180.0 / M_PI);
 	s.scale = SCALES[scale_index];
 }
 
@@ -183,7 +184,7 @@ double MSERStates::smoothCost(int siteID1, int sitdID2, int l1, int l2) {
  *					url: http://ieeexplore.ieee.org/document/7563454/
  */
 
-double MSERtates::stateDistance(int label1, int label2) {
+double MSERStates::stateDistance(int label1, int label2) {
 	int s1_index, s2_index, theta1_index, theta2_index;
 	s1_index = label_1 % quantized_scale_factor;
 	s2_index = label_2 % quantized_scale_factor;
@@ -192,4 +193,28 @@ double MSERtates::stateDistance(int label1, int label2) {
  
 	return abs(s1_index - s2_index) + abs(theta1_index - theta2_index);
 
+}
+
+/* 
+ * Function MSERStates::generateDelaunayNeighbors
+ * Description: Computes the neighbors for each point and stores them in neighborIndexes 2D array
+ *
+ */
+void MSERStates::generateDelaunayNeighbors(std::vector<int>& numNeighbors, std::vector<vector<int> >& neighborsIndexes) {
+	Size size = img.size();
+	Rect rect(0, 0, size.width, size.height);
+
+	Subdiv2D subdiv(rect);
+
+	vector<Point2f> points;
+
+	for (Rect r : msers) {
+		points.push_back(getRectCenter(r));
+	}
+
+	for (int i = 0; i < points.size(); i++) {
+		subdiv.insert(points[i]);
+	}
+
+	//TODO: For each point find its neighbors
 }

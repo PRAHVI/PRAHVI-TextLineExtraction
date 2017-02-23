@@ -36,25 +36,29 @@ public:
 									  quantized_scale_factor(qs) {};
 	
 	static QuantScales SCALES[] = { Pair(64, 5),  /* 12.8 */
-									Pair(64, 4),  /* 16.0 */
-									Pair(64, 3),  /* 21.3 */
-									Pair(128, 5), /* 25.6 */ 
-									Pair(128, 4), /* 32.0 */
-									Pair(128, 3), /* 42.7 */
-									Pair(256, 5), /* 51.2 */
-									Pair(256, 4), /* 64.0 */
-									Pair(256, 3), /* 85.3 */ 
-									Pair(256, 2)  /* 128.0 */
-							      }
+                                    Pair(64, 4),  /* 16.0 */
+                                    Pair(64, 3),  /* 21.3 */
+                                    Pair(128, 5), /* 25.6 */ 
+                                    Pair(128, 4), /* 32.0 */
+                                    Pair(128, 3), /* 42.7 */
+                                    Pair(256, 5), /* 51.2 */
+                                    Pair(256, 4), /* 64.0 */
+                                    Pair(256, 3), /* 85.3 */ 
+                                    Pair(256, 2)  /* 128.0 */
+							      };
 
 	double dataCost(int siteID, int label);	
 	double smoothCost(int siteID1, int sitdID2, int l1, int l2); 
+	Mat& draw();
+	void updateState(int siteID, int label);
+	void generateDelaunayNeighbors(std::vector<int>& numNeighors, std::vector<vector<int> >& neighborsIndexes);
 
 
 private:
 
 	cv::Mat &img;
 	std::vector<cv::Rect> &msers;
+	std::vector<MSERState> msers_states;
 	int quantized_orientation_factor;
 	int quantized_scales_factor;
 	double LAMBDA;
@@ -68,22 +72,3 @@ private:
 };
 
 #endif
-
-
-
-// Flow
-GCoptimizationGeneralGraph gc = GCoptimizationGeneralGraph(num_ccs, num_label);
-
-// Set the data costs funtions
-...
-// May want to set the labels randomly
-gc.setLabelOrder(true) // This visits the ccs in random
-
-gc.expansion();
-
-for (r in cv::Rect) {
-	gc.whatLabel(getSite(r));
-
-
-// Cluster
-	
