@@ -1,12 +1,12 @@
 CC=g++ 
 CFLAGS= -Wall -std=c++11
 
-executable: main.o mserstates.o 
-	$(CC) $(CFLAGS) -o executable `pkg-config --libs opencv` -lfftw3 -L./bin/GraphCutsOptimization/lib -lgraphcutsoptimization main.o mserstates.o 
-main.o:
-	$(CC) $(CFLAGS) `pkg-config --cflags opencv` -I./bin/GraphCutsOptimization/include -c main.cpp
+executable: main.o MSERStates.o CVGeometryUtils.o
+	$(CC) $(CFLAGS) -o executable  main.o MSERStates.o CVGeometryUtils.o `pkg-config --libs opencv` -lfftw3 -L./bin/GraphCutsOptimization/lib -lgraphcutsoptimization
+main.o: 
+	$(CC) $(CFLAGS) `pkg-config --cflags opencv` -I ./bin/GraphCutsOptimization/ -g -c main.cpp 
+MSERStates.o:
+	$(CC) $(CFLAGS) `pkg-config --cflags opencv` -g -c MSERStates.cpp 
 
-mserstates.o:
-	$(CC) $(CFLAGS) `pkg-config --cflags opencv` -c MSERStates.cpp
-
-
+CVGeometryUtils.o:
+	$(CC) $(CFLAGS) `pkg-config --cflags opencv` -g -c CVGeometryUtils.cpp

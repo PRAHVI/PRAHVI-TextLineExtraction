@@ -2,7 +2,6 @@
 #include "CVGeometryUtils.h"
 #include <math.h>
 #include <fftw3.h>
-#include <string>
 
 using namespace std;
 using namespace cv;
@@ -20,12 +19,12 @@ void MSERStates::generateHistogram(int siteID, const MSERState &siteState, vecto
 	Point center = getRectCenter(mser);
 	int radius = siteState.scale.first / 2;
 	double orientation = siteState.orientation;
-	vector<Rect&> msers_in_region;
+	vector<Rect*> msers_in_region;
 
 	/* First iterate and find the msers in the circular region so we dont waste time later */
 	for (Rect r : msers) {
 		if (isRectInCircle(r, center, radius))
-			msers_in_region.push_back(r);
+			msers_in_region.push_back(&r);
 	}
 
 	Point p1, p2;
@@ -82,7 +81,7 @@ void MSERStates::encodeLabelToState(int label, MSERState &s) {
  *
  *					url: http://ieeexplore.ieee.org/document/7563454/
  */
-double MSERStates::dataCost(int siteID, int label) {
+int MSERStates::dataCost(int siteID, int label) {
 	MSERState siteState;
 	vector<int> histogram;
 
@@ -133,7 +132,7 @@ double MSERStates::dataCost(int siteID, int label) {
 	double v_p2 = log10(static_cast<double>(len_set_x_neq_0) / static_cast<double>(histogram.size()));
 
 
-	return (LAMBDA * v_p1) + ((1.0 - LAMBDA) * v_p2);
+	return static_cast<int>((LAMBDA * v_p1) + ((1.0 - LAMBDA) * v_p2));
 
 }
 
@@ -150,7 +149,7 @@ double MSERStates::dataCost(int siteID, int label) {
  *					url: http://ieeexplore.ieee.org/document/7563454/
  *				
  */
-double MSERStates::smoothCost(int siteID1, int siteID2, int l1, int l2) {
+int MSERStates::smoothCost(int siteID1, int siteID2, int l1, int l2) {
 	Rect mser1 = this->msers[siteID1]; 
 	Rect mser2 = this->msers[siteID2];
 	MSERState s1, s2;
@@ -166,7 +165,7 @@ double MSERStates::smoothCost(int siteID1, int siteID2, int l1, int l2) {
 	double s1_squared = pow(static_cast<double>(s1.scale.first) / static_cast<double>(s1.scale.second), 2);
 	double s2_squared = pow(static_cast<double>(s1.scale.first) / static_cast<double>(s1.scale.second), 2);
 
-	return u_1_2 * exp(- (BETA * distance_squared_site1_site2) / ( s1_squared + s2_squared ) ); 
+	return static_cast<int>(u_1_2 * exp(- (BETA * distance_squared_site1_site2) / ( s1_squared + s2_squared ) )); 
 }
 
 /*
@@ -186,13 +185,13 @@ double MSERStates::smoothCost(int siteID1, int siteID2, int l1, int l2) {
  */
 
 double MSERStates::stateDistance(int label1, int label2) {
-	int s1_index, s2_index, theta1_index, theta2_index;
-	s1_index = label1 % quantized_scale_factor;
-	s2_index = label2 % quantized_scale_factor;
-	theta1_index = (theta1_index / quantized_scale_factor) % ((quantized_orientation_factor / 2) + 1);
-	theta2_index = (theta2_index / quantized_scale_factor) % ((quantized_orientation_factor/ 2) + 1);
- 
-	return abs(s1_index - s2_index) + abs(theta1_index - theta2_index);
+	int orientation_index1 = (label1 / quantized_scale_factor) % ((quantized_orientation_factor / 2) + 1);
+	int scale_index1 = label1 % quantized_scale_factor;
+	int orientation_index2 = (label2 / quantized_scale_factor) % ((quantized_orientation_factor / 2) + 1);
+	int scale_index2 = label2 % quantized_scale_factor;
+
+
+	return abs(scale_index1 - scale_index2) + abs(orientation_index1 - orientation_index2);
 
 }
 
@@ -208,7 +207,8 @@ string pointToString(const Point &p)
  *				IMPORTANT: This function is not responsible for deallocation of memory
  *
  */
-void MSERStates::generateDelaunayNeighbors(int *numNeighbors, int **neighborsIndexes) {
+void MSERStates::generateDelaunayNeighbors(int *numNeighbors, int **neighborsIndexes, int **neighborWeights) 
+{
 	Size size = this->img.size();
 	Rect rect(0, 0, size.width, size.height);
 	MSERIDMap mser_id_map;
@@ -219,10 +219,10 @@ void MSERStates::generateDelaunayNeighbors(int *numNeighbors, int **neighborsInd
 	vector<Vec6f> triangleList;
 		
 	for (int i = 0; i < this->msers.size(); i++) {
-		Rect r = this->mser[i];
+		Rect r = this->msers[i];
 		Point rect_center = getRectCenter(r);
 		points.push_back(rect_center);
-		mser_id_map.insert(MSERIDMap::value_type(pointToString(rect_center, i)));
+		mser_id_map.insert(MSERIDMap::value_type(pointToString(rect_center), i));
 	}
 
 	for (int i = 0; i < points.size(); i++) {
@@ -237,14 +237,15 @@ void MSERStates::generateDelaunayNeighbors(int *numNeighbors, int **neighborsInd
 	NeighborMap nm;
 	
 	for (int i = 0; i < triangleList.size(); i++) {
-		pts[0] = Point(cvRound(triangleList[i][0]), cvRound(triangleList[i][0]));
-		pts[1] = Point(cvRound(triangleList[i][2]), cvRound(triangleList[i][2]));
-		pts[2] = Point(cvRound(triangleList[i][4]), cvRound(triangleList[i][4]));
+		Vec6f t = triangleList[i];
+		pts[0] = Point(cvRound(t[0]), cvRound(t[1]));
+		pts[1] = Point(cvRound(t[2]), cvRound(t[3]));
+		pts[2] = Point(cvRound(t[4]), cvRound(t[5]));
 		
 		for (int j = 0; j < pts.size(); j++) {
-			int n1_id = mser_id_map[pointToString(pts[(i + 1) % pts.size()]]];
-			int n2_id = mser_id_map[pointToString(pts[(i + 2) % pts.size()])];
-			int id = mser_id_map[pointToString(pts[i])];
+			int n1_id = mser_id_map[pointToString(pts[ (j + 1) % pts.size()] )];
+			int n2_id = mser_id_map[pointToString(pts[(j + 2) % pts.size()])];
+			int id = mser_id_map[pointToString(pts[j])];
 
 			NeighborMap::const_iterator got = nm.find(id);
 
@@ -263,18 +264,46 @@ void MSERStates::generateDelaunayNeighbors(int *numNeighbors, int **neighborsInd
 	////////////////////////////////////////////////////
 	int num_sites = this->msers.size();	
 	numNeighbors = new int[num_sites];
-	neighborsIndexes = new int[num_sites];
+	neighborsIndexes = new int*[num_sites];
+	neighborWeights = new int*[num_sites];
+
 
 	for (int i = 0; i < num_sites; i++) {
-		int arr_size = nm[i].size();
-		numNeighbors[i] = arr_size;
-		neighborsIndexes = new int[arr_size];
+		//TODO: Could be that nm[i] does not exist
+		NeighborMap::const_iterator got = nm.find(i);
 
-		Neighbors::const_iterator it = nm[i].begin();
-		for (int j = 0; it != nm[i].end(); it++, j++) {
-			neighborsIndexes[i][j] = *it;
+		if (got == nm.end()) {
+			numNeighbors[i] = 0;
+		} else {
+			int arr_size = nm[i].size();
+			numNeighbors[i] = arr_size;
+			neighborsIndexes[i] = new int[arr_size];
+			neighborWeights[i] = new int[arr_size];
+
+			Neighbors::const_iterator it = nm[i].begin();
+			for (int j = 0; it != nm[i].end(); it++, j++) {
+				neighborsIndexes[i][j] = *it;
+				neighborWeights[i][j] = 1;
+
+			}
 		}
+
+		
 
 	}
 
+	for (int i = 0; i < num_sites; i++) {
+		cout << "numNeighbors[" << i << "] = " << numNeighbors[i] << endl;
+	}
+
+}
+
+int MSERStates::static_dataCost(int siteID, int label, void *object)
+{
+	return static_cast<MSERStates*>(object)->dataCost(siteID, label);
+}
+
+int MSERStates::static_smoothCost(int siteID1, int siteID2, int l1, int l2, void *object)
+{
+	return static_cast<MSERStates*>(object)->smoothCost(siteID1, siteID2, l1, l2);
 }

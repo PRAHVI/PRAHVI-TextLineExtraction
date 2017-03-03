@@ -1,6 +1,6 @@
 #include <opencv2/opencv.hpp>
 #include "MSERStates.h"
-#include "GCoptimization.h"
+#include <GCoptimization.h>
 #include "CVGeometryUtils.h"
 #include <iostream>
 
@@ -9,13 +9,17 @@
 using namespace std;
 using namespace cv;
 
-void testDataCost();
+//void testDataCost();
 void mserExtractor(Mat& image, vector<cv::Rect>& msers_bbox);
 
 int main(int argc, char** argv) {
 
-	if (TESTING) 
-		testDataCost();
+	//if (TESTING) 
+//		testDataCost();
+
+	Mat img = imread("test_images/0000.jpg", IMREAD_GRAYSCALE);
+	vector<Rect> msers_bbox;
+	mserExtractor(img, msers_bbox);
 
 	int num_labels = 10 * 32;
 	int *numNeighbors;
@@ -24,18 +28,37 @@ int main(int argc, char** argv) {
 
 	MSERStates image_states = MSERStates(img, msers_bbox);
 	image_states.generateDelaunayNeighbors(numNeighbors, neighborIndexes, neighborWeights);
-	GCoptimizationGeneralGraph gc = GCoptimizationGeneralGraph(num_ccs, num_labels);
-	gc.setAllNeighbors(numNeighbors, neighborIndexes, neighborWeights);
-	gc.setDataCost(image_states.dataCost);
-	gc.setSmoothCost(image_states.smoothCost);
-	gc.setLabelOrder(true);
-	gc.expansion();
-	
+
 	for (int i = 0; i < msers_bbox.size(); i++) {
-		image_states.updateState(i, gc.whatLabel(i));
+		cout << "numNeighbors[" << i << "] = " << numNeighbors[i] << endl;
 	}
 
-	Mat states_image = image_states.draw();
+	cout << msers_bbox.size() << endl;
+	try {
+		GCoptimizationGeneralGraph *gc = new GCoptimizationGeneralGraph(msers_bbox.size(), num_labels);
+		gc->setDataCost(MSERStates::static_dataCost, &image_states);
+		gc->setSmoothCost(MSERStates::static_smoothCost, &image_states);
+
+		gc->setAllNeighbors(numNeighbors, neighborIndexes, neighborWeights);
+		//gc->setLabelOrder(true);
+		//gc->expansion();
+
+
+		delete gc;
+	} catch (GCException e) {
+		e.Report();
+	}
+
+	//gc.setDataCost(MSERStates::static_dataCost, &image_states);
+	//gc.setSmoothCost(MSERStates::static_smoothCost, &image_states);
+	//gc.setLabelOrder(true);
+	//gc.expansion();
+	
+	//for (int i = 0; i < msers_bbox.size(); i++) {
+	//	image_states.updateState(i, gc.whatLabel(i));
+	//}
+
+	//Mat states_image = image_states.draw();
 	return 0;
 }	
 

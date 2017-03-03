@@ -9,11 +9,11 @@ Point getRectCenter(Rect r) {
 }
 
 
-void getLinePointsThroughRegionCenterAtDegree(double degree, Point center, int radius, Point &p1, Point &p2) {
+void getLinePointsThroughRegionCenterAtDegree(double deg, const Point &center, int radius, Point &p1, Point &p2) {
 	int del_x, del_y;
 
-	del_x = radius * cos(degree * M_PI / 180.0);	
-	del_y = - radius * sin(degree * M_PI / 180.0);	
+	del_x = radius * cos(deg * M_PI / 180.0);	
+	del_y = - radius * sin(deg * M_PI / 180.0);	
 
 	p1.x = center.x + del_x;
 	p1.y = center.y + del_y;

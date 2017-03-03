@@ -12,13 +12,14 @@
 #include <vector>
 #include <unordered_map>
 #include <set>
+#include <string>
 
 #define Pair std::make_pair
 typedef std::vector<std::pair <int, int> > QuantScales;
 typedef std::pair<int, int> Scale;
-typedef std::unordered_map<int, set<int> > NeighborMap;
 typedef std::set<int> Neighbors;
-typedef std::unordered_map<string, int> MSERIDMap;
+typedef std::unordered_map<int, Neighbors > NeighborMap;
+typedef std::unordered_map<std::string, int> MSERIDMap;
 
 
 typedef struct MSERState {
@@ -55,11 +56,14 @@ public:
                                  Pair(256, 2)  /* 128.0 */
 							   };
 
-	double dataCost(int siteID, int label);	
-	double smoothCost(int siteID1, int siteID2, int l1, int l2); 
+	static int static_dataCost(int siteID, int label, void *object);
+	static int static_smoothCost(int siteID1, int siteID2, int l1, int l2, void *object);
+
+	int dataCost(int siteID, int label);	
+	int smoothCost(int siteID1, int siteID2, int l1, int l2); 
 	cv::Mat& draw();
 	void updateState(int siteID, int label);
-	void generateDelaunayNeighbors(int *numNeighors, int **neighborsIndexes);
+	void generateDelaunayNeighbors(int *numNeighors, int **neighborsIndexes, int **neighborWeights);
 
 
 private:
