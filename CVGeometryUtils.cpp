@@ -24,8 +24,19 @@ void getLinePointsThroughRegionCenterAtDegree(double degree, Point center, int r
 }
 
 
-void getPerpendicularLinePoints(int, double, Point, int, Point, Point) {	
+void getPerpendicularLinePoints(int pos, int radius, double deg, LineIterator &l, Point &p1, Point &p2) {	
+	Point cur_point = l.pos();
+	double percent_traveled = static_cast<double>(pos) / l.count;
+	int x = radius * (2.0 * percent_traveled - 1);
+	int y = sqrt(pow(radius, 2) - pow(x, 2)); 
+	int del_x = y * cos( (90.0 + deg) * (M_PI / 180.0)); 
+	int del_y = y * sin( (90.0 + deg) * (M_PI / 180.0));
 
+	p1.x = cur_point.x + del_x;
+	p1.y = cur_point.y + del_y;	
+
+	p2.x = cur_point.x - del_x;
+	p2.y = cur_point.y - del_y;
 }	
 
 
@@ -54,6 +65,7 @@ bool isRectInLine(const Rect &r, const Point &start, const Point &end) {
 }
 
 bool isRectInCircle(const cv::Rect &r, const cv::Point &center, int radius) {
-
+	Point rect_center = getRectCenter(r);
+	return pow(rect_center.x - center.x, 2) + pow(rect_center.y - center.y, 2) < pow(radius, 2);
 }
 

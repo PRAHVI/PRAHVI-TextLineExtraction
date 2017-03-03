@@ -1,8 +1,8 @@
 #include "MSERStates.h"
-#include <opencv2/opencv.hpp>
 #include "CVGeometryUtils.h"
 #include <math.h>
 #include <fftw3.h>
+#include <string>
 
 using namespace std;
 using namespace cv;
@@ -16,7 +16,7 @@ using namespace cv;
  *
  */	
 void MSERStates::generateHistogram(int siteID, const MSERState &siteState, vector<int> &histogram) {
-	Rect mser = msers[siteID];
+	Rect mser = this->msers[siteID];
 	Point center = getRectCenter(mser);
 	int radius = siteState.scale.first / 2;
 	double orientation = siteState.orientation;
@@ -24,29 +24,27 @@ void MSERStates::generateHistogram(int siteID, const MSERState &siteState, vecto
 
 	/* First iterate and find the msers in the circular region so we dont waste time later */
 	for (Rect r : msers) {
-		if (isRectInCircle(r, center, radius) 
-				mser_in_region.push_back(r);
+		if (isRectInCircle(r, center, radius))
+			msers_in_region.push_back(r);
 	}
 
 	Point p1, p2;
-	LineIterator center_axis;
 
 	getLinePointsThroughRegionCenterAtDegree(orientation, center, radius, p1, p2);	
 	
-	center_axis = LineIterator(img, p1, p2);
+	LineIterator center_axis(this->img, p1, p2);
 
 	/* Init histogram to zeros */
 	histogram.resize(center_axis.count, 0);
 
 	/* Counts # cc perpendicular to the axis line */
 	for (int i = 0; i < center_axis.count; i++, center_axis++) {
-		Point poi = center_axis.pos();
 		Point perp_p1, perp_p2;
 
-		getPerpendicularLinePoints(radius, orientaion, poi, center_axis.count, perp_p1, perp_p2);
+		getPerpendicularLinePoints(i, radius, orientation, center_axis, perp_p1, perp_p2);
 
 		for (Rect r : msers) {
-			if (isrRctInLine(r, perp_p1, perp_p2)) 
+			if (isRectInLine(r, perp_p1, perp_p2)) 
 				histogram[i]++;
 		}
 	}
@@ -63,10 +61,11 @@ void MSERStates::generateHistogram(int siteID, const MSERState &siteState, vecto
  *					- scale(int N, int k)
  */
 void MSERStates::encodeLabelToState(int label, MSERState &s) {
-	int k_orientation = label / qunatized_scale_factor;
+	int k_orientation = label / quantized_scale_factor;
 	int scale_index = label % quantized_scale_factor;
 
-	s.orientation = (static_cast<double>(k_orientation) * M_PI / static_cast<double>(quantized_orientation_factor)) * (180.0 / M_PI);
+	s.orientation = (static_cast<double>(k_orientation) * M_PI / 
+					static_cast<double>(quantized_orientation_factor)) * (180.0 / M_PI);
 	s.scale = SCALES[scale_index];
 }
 
@@ -87,7 +86,7 @@ double MSERStates::dataCost(int siteID, int label) {
 	MSERState siteState;
 	vector<int> histogram;
 
-	encodeLabelToState(label, stateState);
+	encodeLabelToState(label, siteState);
 	
 	generateHistogram(siteID, siteState, histogram);
 
@@ -104,13 +103,13 @@ double MSERStates::dataCost(int siteID, int label) {
 	
 	int k;
 	if ( (k_new - static_cast<double>(static_cast<int>(k_new)) ) >  0.5)
-		k = ciel(k_new);
+		k = ceil(k_new);
 	else
 		k = floor(k_new);
 
 	x = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * histogram.size());
 	X = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * histogram.size());
-	p = fftw_plan_dft(histogram.size(), in, out, FFTW_FORWARD, FFTW_ESTIMATE);
+	p = fftw_plan_dft_1d(histogram.size(), x, X, FFTW_FORWARD, FFTW_ESTIMATE);
 	
 	for (int i = 0; i < histogram.size(); i++) {
 		x[i][0] = static_cast<double>(histogram[i]);
@@ -129,11 +128,12 @@ double MSERStates::dataCost(int siteID, int label) {
 	for (int i = 0; i < histogram.size(); i++) {
 		if (histogram[i] != 0) 
 			len_set_x_neq_0++;
+	}
 		
 	double v_p2 = log10(static_cast<double>(len_set_x_neq_0) / static_cast<double>(histogram.size()));
 
 
-	return (LAMBDA * v_p1) + ((1 - LAMBDA) * v_p2);
+	return (LAMBDA * v_p1) + ((1.0 - LAMBDA) * v_p2);
 
 }
 
@@ -150,9 +150,10 @@ double MSERStates::dataCost(int siteID, int label) {
  *					url: http://ieeexplore.ieee.org/document/7563454/
  *				
  */
-double MSERStates::smoothCost(int siteID1, int sitdID2, int l1, int l2) {
-	Rect mser1 = msers[siteID1], mser2 = msers[siteID2];
-	MSERtate s1, s2;
+double MSERStates::smoothCost(int siteID1, int siteID2, int l1, int l2) {
+	Rect mser1 = this->msers[siteID1]; 
+	Rect mser2 = this->msers[siteID2];
+	MSERState s1, s2;
 	Point site1_center = getRectCenter(mser1), site2_center = getRectCenter(mser2);
 	
 	encodeLabelToState(l1, s1);
@@ -186,8 +187,8 @@ double MSERStates::smoothCost(int siteID1, int sitdID2, int l1, int l2) {
 
 double MSERStates::stateDistance(int label1, int label2) {
 	int s1_index, s2_index, theta1_index, theta2_index;
-	s1_index = label_1 % quantized_scale_factor;
-	s2_index = label_2 % quantized_scale_factor;
+	s1_index = label1 % quantized_scale_factor;
+	s2_index = label2 % quantized_scale_factor;
 	theta1_index = (theta1_index / quantized_scale_factor) % ((quantized_orientation_factor / 2) + 1);
 	theta2_index = (theta2_index / quantized_scale_factor) % ((quantized_orientation_factor/ 2) + 1);
  
@@ -195,26 +196,85 @@ double MSERStates::stateDistance(int label1, int label2) {
 
 }
 
+string pointToString(const Point &p) 
+{
+	return to_string(p.x) + "," + to_string(p.y);
+}
+
 /* 
  * Function MSERStates::generateDelaunayNeighbors
- * Description: Computes the neighbors for each point and stores them in neighborIndexes 2D array
+ * Description: Computes the neighbors for each point and allocates and stores them 
+ *				in neighborIndexes 2D array. 
+ *				IMPORTANT: This function is not responsible for deallocation of memory
  *
  */
-void MSERStates::generateDelaunayNeighbors(std::vector<int>& numNeighbors, std::vector<vector<int> >& neighborsIndexes) {
-	Size size = img.size();
+void MSERStates::generateDelaunayNeighbors(int *numNeighbors, int **neighborsIndexes) {
+	Size size = this->img.size();
 	Rect rect(0, 0, size.width, size.height);
+	MSERIDMap mser_id_map;
 
 	Subdiv2D subdiv(rect);
 
 	vector<Point2f> points;
-
-	for (Rect r : msers) {
-		points.push_back(getRectCenter(r));
+	vector<Vec6f> triangleList;
+		
+	for (int i = 0; i < this->msers.size(); i++) {
+		Rect r = this->mser[i];
+		Point rect_center = getRectCenter(r);
+		points.push_back(rect_center);
+		mser_id_map.insert(MSERIDMap::value_type(pointToString(rect_center, i)));
 	}
 
 	for (int i = 0; i < points.size(); i++) {
 		subdiv.insert(points[i]);
 	}
 
-	//TODO: For each point find its neighbors
+	/////////////////////////////////////////////////////
+	//				Neighbor Hashing                  //	
+	////////////////////////////////////////////////////
+	subdiv.getTriangleList(triangleList);
+	vector<Point> pts(3);
+	NeighborMap nm;
+	
+	for (int i = 0; i < triangleList.size(); i++) {
+		pts[0] = Point(cvRound(triangleList[i][0]), cvRound(triangleList[i][0]));
+		pts[1] = Point(cvRound(triangleList[i][2]), cvRound(triangleList[i][2]));
+		pts[2] = Point(cvRound(triangleList[i][4]), cvRound(triangleList[i][4]));
+		
+		for (int j = 0; j < pts.size(); j++) {
+			int n1_id = mser_id_map[pointToString(pts[(i + 1) % pts.size()]]];
+			int n2_id = mser_id_map[pointToString(pts[(i + 2) % pts.size()])];
+			int id = mser_id_map[pointToString(pts[i])];
+
+			NeighborMap::const_iterator got = nm.find(id);
+
+			if (got == nm.end()) {
+				Neighbors ns( {n1_id, n2_id} );
+				nm.insert(NeighborMap::value_type(id, ns));
+			} else {
+				nm[id].insert(n1_id);
+				nm[id].insert(n2_id);
+			}
+		}
+	}
+
+	//////////////////////////////////////////////////////
+	//				ALLOCATION						   //
+	////////////////////////////////////////////////////
+	int num_sites = this->msers.size();	
+	numNeighbors = new int[num_sites];
+	neighborsIndexes = new int[num_sites];
+
+	for (int i = 0; i < num_sites; i++) {
+		int arr_size = nm[i].size();
+		numNeighbors[i] = arr_size;
+		neighborsIndexes = new int[arr_size];
+
+		Neighbors::const_iterator it = nm[i].begin();
+		for (int j = 0; it != nm[i].end(); it++, j++) {
+			neighborsIndexes[i][j] = *it;
+		}
+
+	}
+
 }
